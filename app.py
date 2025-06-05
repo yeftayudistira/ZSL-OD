@@ -5,7 +5,7 @@ from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 
 @st.cache_resource
 def load_grounding_dino():
-    model_id = "IDEA-Research/grounding-dino-base"
+    model_id = "IDEA-Research/grounding-dino-tiny"
     processor = AutoProcessor.from_pretrained(model_id)
     model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

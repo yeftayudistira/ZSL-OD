@@ -28,39 +28,40 @@ def predict(image, text_prompts, processor, model, device, model_type="dino", th
     if not text_prompts or not isinstance(text_prompts, list):
         raise ValueError("`text_prompts` harus berupa list of strings.")
 
-    inputs = processor(images=image, text=text_prompts, return_tensors="pt").to(device)
+    # Gabungkan teks menjadi satu string jika untuk GroundingDINO
+    if model_type == "dino":
+        text_input = ", ".join(text_prompts)  # atau gunakan ". " jika lebih sesuai
+    elif model_type == "owlvit":
+        text_input = text_prompts
+    else:
+        raise ValueError("model_type harus 'dino' atau 'owlvit'.")
+
+    # Pemrosesan input
+    inputs = processor(images=image, text=text_input, return_tensors="pt").to(device)
 
     with torch.no_grad():
         outputs = model(**inputs)
 
-    target_sizes = [image.size[::-1]]  # (height, width)
+    target_sizes = [image.size[::-1]]  # (H, W)
 
     if model_type == "dino":
         results = processor.post_process_grounded_object_detection(
             outputs, threshold=threshold, target_sizes=target_sizes
         )[0]
+        # DINO hanya bisa pakai satu prompt, label-nya selalu sama
+        labels = [text_prompts[label_id] for label_id in results["labels"].cpu().tolist()]
     elif model_type == "owlvit":
         results = processor.post_process_object_detection(
             outputs=outputs, target_sizes=target_sizes, threshold=threshold
         )[0]
+        labels = [text_prompts[label_id] for label_id in results["labels"].cpu().tolist()]
     else:
-        raise ValueError("model_type harus 'dino' atau 'owlvit'.")
+        raise ValueError("model_type tidak valid")
 
     boxes = results["boxes"].cpu().tolist()
-    labels = [text_prompts[i] for i in results["labels"].cpu().tolist()]
     scores = results["scores"].cpu().tolist()
 
     return boxes, labels, scores
-
-# Draw boxes on image
-def draw_boxes_on_image(image, boxes, labels, scores):
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
-
-    for box, label, score in zip(boxes, labels, scores):
-        x0, y0, x1, y1 = box
-        draw.rectangle([x0, y0, x1, y1], outline="red", width=2)
-        draw.text((x0, y0), f"{label} {score:.2f}", fill="red", font=font)
 
     return image
 

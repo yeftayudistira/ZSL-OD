@@ -28,7 +28,6 @@ def predict(image, text_prompts, processor, model, device, model_type="dino", th
     if not text_prompts or not isinstance(text_prompts, list):
         raise ValueError("`text_prompts` harus berupa list of strings.")
 
-    # Format prompt sesuai jenis model
     if model_type == "dino":
         text_input = ", ".join(text_prompts)
     elif model_type == "owlvit":
@@ -36,7 +35,6 @@ def predict(image, text_prompts, processor, model, device, model_type="dino", th
     else:
         raise ValueError("model_type harus 'dino' atau 'owlvit'.")
 
-    # Tokenisasi & inference
     inputs = processor(images=image, text=text_input, return_tensors="pt").to(device)
     with torch.no_grad():
         outputs = model(**inputs)
@@ -51,10 +49,15 @@ def predict(image, text_prompts, processor, model, device, model_type="dino", th
         raise ValueError("model_type tidak valid")
 
     boxes = results["boxes"].cpu().tolist()
-    label_indices = results["labels"].cpu().tolist()
+
+    # Fix error: check if labels is Tensor or list
+    if isinstance(results["labels"], torch.Tensor):
+        label_indices = results["labels"].cpu().tolist()
+    else:
+        label_indices = results["labels"]
+
     scores = results["scores"].cpu().tolist()
 
-    # Hindari IndexError jika label_id > len(prompt)
     labels = [text_prompts[i] if i < len(text_prompts) else "unknown" for i in label_indices]
 
     return boxes, labels, scores
@@ -84,7 +87,7 @@ def main():
 
     if uploaded_file and text_prompts:
         image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="🖼️ Gambar Input", use_column_width=True)
+        st.image(image, caption="🖼️ Gambar Input", use_container_width=True)
 
         # Load models
         dino_processor, dino_model, dino_device = load_grounding_dino()
@@ -94,7 +97,7 @@ def main():
         st.subheader("📦 Hasil Deteksi - Grounding DINO")
         boxes, labels, scores = predict(image, text_prompts, dino_processor, dino_model, dino_device, model_type="dino", threshold=threshold)
         dino_img = draw_boxes_on_image(image.copy(), boxes, labels, scores)
-        st.image(dino_img, caption="Grounding DINO", use_column_width=True)
+        st.image(dino_img, caption="Grounding DINO", use_container_width=True)
         for label, score, box in zip(labels, scores, boxes):
             st.write(f"{label}: {score:.2f} - Box: {box}")
 
@@ -102,7 +105,7 @@ def main():
         st.subheader("📦 Hasil Deteksi - OWL-ViT")
         boxes, labels, scores = predict(image, text_prompts, owl_processor, owl_model, owl_device, model_type="owlvit", threshold=threshold)
         owl_img = draw_boxes_on_image(image.copy(), boxes, labels, scores)
-        st.image(owl_img, caption="OWL-ViT", use_column_width=True)
+        st.image(owl_img, caption="OWL-ViT", use_container_width=True)
         for label, score, box in zip(labels, scores, boxes):
             st.write(f"{label}: {score:.2f} - Box: {box}")
 

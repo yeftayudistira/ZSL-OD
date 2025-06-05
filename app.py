@@ -21,22 +21,24 @@ def load_owlvit():
     model.to(device)
     return processor, model, device
 
-def predict(image, text_prompts, processor, model, device, threshold=0.3):
+def predict(image, text_prompts, processor, model, device):
+    if not text_prompts or not isinstance(text_prompts, list):
+        raise ValueError("`text_prompts` harus berupa list of strings.")
+
     inputs = processor(images=image, text=text_prompts, return_tensors="pt").to(device)
+    
     with torch.no_grad():
         outputs = model(**inputs)
 
-    results = processor.post_process_grounded_object_detection(
-        outputs,
-        threshold=threshold,
-        target_sizes=[image.size[::-1]]
-    )[0]
+    target_sizes = [image.size[::-1]]
+    results = processor.post_process_grounded_object_detection(outputs, threshold=0.3, target_sizes=target_sizes)[0]
 
     boxes = results["boxes"].cpu().tolist()
     labels = [text_prompts[i] for i in results["labels"].cpu().tolist()]
     scores = results["scores"].cpu().tolist()
 
     return boxes, labels, scores
+
 
 def main():
     st.title("Deteksi Objek dengan GroundingDINO & OWL-ViT")

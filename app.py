@@ -39,26 +39,25 @@ def predict(image, text_prompts, processor, model, device, model_type="dino", th
     with torch.no_grad():
         outputs = model(**inputs)
 
-    target_sizes = [image.size[::-1]]  # (H, W)
+    target_sizes = [image.size[::-1]]
 
     if model_type == "dino":
         results = processor.post_process_grounded_object_detection(outputs, threshold=threshold, target_sizes=target_sizes)[0]
-    elif model_type == "owlvit":
-        results = processor.post_process_object_detection(outputs=outputs, target_sizes=target_sizes, threshold=threshold)[0]
     else:
-        raise ValueError("model_type tidak valid")
+        results = processor.post_process_object_detection(outputs=outputs, target_sizes=target_sizes, threshold=threshold)[0]
 
     boxes = results["boxes"].cpu().tolist()
+    scores = results["scores"].cpu().tolist()
 
-    # Fix error: check if labels is Tensor or list
     if isinstance(results["labels"], torch.Tensor):
         label_indices = results["labels"].cpu().tolist()
     else:
         label_indices = results["labels"]
 
-    scores = results["scores"].cpu().tolist()
-
-    labels = [text_prompts[i] if i < len(text_prompts) else "unknown" for i in label_indices]
+    if model_type == "dino":
+        labels = [text_prompts[0]] * len(boxes)  # semua pakai prompt tunggal
+    else:
+        labels = [text_prompts[i] if i < len(text_prompts) else "unknown" for i in label_indices]
 
     return boxes, labels, scores
 
